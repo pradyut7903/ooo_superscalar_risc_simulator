@@ -1,0 +1,16 @@
+{
+    "version": "2.0.0",
+    "configurations": [
+        {
+            "name": "Debug pipeline_sim",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/pipeline_sim.exe",
+            "args": ["traces/sample.trace"],
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "build pipeline_sim",
+            "MIMode": "gdb",
+            "miDebuggerPath": "gdb.exe"
+        }
+    ]
+}

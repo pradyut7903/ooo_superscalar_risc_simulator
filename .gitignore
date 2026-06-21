@@ -1,0 +1,17 @@
+# Build outputs
+build/
+cmake-build-*/
+out/
+
+# Compiled objects and binaries
+*.o
+*.obj
+*.exe
+*.out
+*.app
+pipeline_sim
+pipeline_sim.exe
+
+# IDE
+.vs/
+*.user
