@@ -38,11 +38,15 @@ void ExecutionUnit::clear() {
     computed_value = 0;
 }
 
-ExecutionEngine::ExecutionEngine(int cdb_ports) : cdb_bandwidth(cdb_ports) {
-    units.push_back(ExecutionUnit("ALU", 1));
-    units.push_back(ExecutionUnit("ALU", 1));
-    units.push_back(ExecutionUnit("MUL", 3));
-    units.push_back(ExecutionUnit("DIV", 10));
+ExecutionEngine::ExecutionEngine(int cdb_ports)
+    : ExecutionEngine(cdb_ports, 2, 1, 1, 1, 3, 10) {}
+
+ExecutionEngine::ExecutionEngine(int cdb_ports, int n_alu, int n_mul, int n_div,
+                                 int alu_lat, int mul_lat, int div_lat)
+    : cdb_bandwidth(cdb_ports) {
+    for (int i = 0; i < n_alu; ++i) units.push_back(ExecutionUnit("ALU", alu_lat));
+    for (int i = 0; i < n_mul; ++i) units.push_back(ExecutionUnit("MUL", mul_lat));
+    for (int i = 0; i < n_div; ++i) units.push_back(ExecutionUnit("DIV", div_lat));
 }
 
 bool ExecutionEngine::issueInstruction(std::string op, int val1, int val2, int rob_id) {

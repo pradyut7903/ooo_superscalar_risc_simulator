@@ -30,9 +30,14 @@ private:
     std::vector<LSQEntry> queue;
     int capacity;
     int cdb_bandwidth;
+    int mem_latency;        // load latency when served from memory
+    int fwd_latency;        // load latency when served by store-to-load forwarding
+    bool store_forwarding;  // when false, every load goes to memory
 
 public:
-    LoadStoreQueue(int size, int cdb_ports);
+    LoadStoreQueue(int size, int cdb_ports,
+                   int memory_latency = 5, int forward_latency = 1,
+                   bool enable_forwarding = true);
 
     bool allocate(uint32_t id, int rob_id, bool is_load);
     bool hasSpace() const;

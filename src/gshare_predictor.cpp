@@ -46,10 +46,15 @@ void GSharePredictor::update(uint64_t pc, bool actual_taken, uint64_t actual_tar
         }
     }
 
-    int btb_index = static_cast<int>(pc % btb_size);
-    btb[btb_index].valid = true;
-    btb[btb_index].pc_tag = pc;
-    btb[btb_index].target_addr = actual_target;
+    // A BTB target is only meaningful for taken branches. Writing the fall-through
+    // PC on a not-taken branch pollutes the entry, so that a later taken prediction
+    // jumps to the wrong (fall-through) target. Only update the BTB on taken.
+    if (actual_taken) {
+        int btb_index = static_cast<int>(pc % btb_size);
+        btb[btb_index].valid = true;
+        btb[btb_index].pc_tag = pc;
+        btb[btb_index].target_addr = actual_target;
+    }
 
     ghr = ((ghr << 1) | (actual_taken ? 1u : 0u)) & ghr_mask;
 }

@@ -1,0 +1,4 @@
+# expected architectural state for ilp_serial
+R1 2000
+R2 2000
+R3 2001000

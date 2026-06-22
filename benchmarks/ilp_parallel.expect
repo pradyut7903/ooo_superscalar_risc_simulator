@@ -1,0 +1,7 @@
+# expected architectural state for ilp_parallel
+R1 500
+R2 500
+R3 500
+R4 1000
+R5 1500
+R6 2000

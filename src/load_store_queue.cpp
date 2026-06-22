@@ -1,8 +1,26 @@
 #include "load_store_queue.hpp"
 
-std::vector<int> MainMemory(1024, 0);
+std::vector<int> MainMemory(65536, 0);
 
-LoadStoreQueue::LoadStoreQueue(int size, int cdb_ports) : capacity(size), cdb_bandwidth(cdb_ports) {
+namespace {
+// Guarded memory access so an out-of-range trace address fails soft (returns 0 /
+// is dropped) instead of corrupting memory or segfaulting the simulator.
+int memRead(int addr) {
+    if (addr < 0 || static_cast<size_t>(addr) >= MainMemory.size()) return 0;
+    return MainMemory[addr];
+}
+void memWrite(int addr, int value) {
+    if (addr < 0 || static_cast<size_t>(addr) >= MainMemory.size()) return;
+    MainMemory[addr] = value;
+}
+}  // namespace
+
+LoadStoreQueue::LoadStoreQueue(int size, int cdb_ports,
+                               int memory_latency, int forward_latency,
+                               bool enable_forwarding)
+    : capacity(size), cdb_bandwidth(cdb_ports),
+      mem_latency(memory_latency), fwd_latency(forward_latency),
+      store_forwarding(enable_forwarding) {
     queue.resize(capacity);
     for (int i = 0; i < capacity; i++) {
         queue[i].valid = false;
@@ -97,17 +115,19 @@ bool LoadStoreQueue::dispatchLoad(uint32_t load_id) {
     uint32_t youngest_older_store_age = 0;
     int forwarded_data = 0;
 
-    for (int i = 0; i < capacity; i++) {
-        if (queue[i].valid && !queue[i].is_load && queue[i].inst_id < load_age) {
-            if (queue[i].addr_ready && queue[i].address == target_addr) {
-                if (!found_forwarding_store || queue[i].inst_id > youngest_older_store_age) {
-                    found_forwarding_store = true;
-                    youngest_older_store_age = queue[i].inst_id;
+    if (store_forwarding) {
+        for (int i = 0; i < capacity; i++) {
+            if (queue[i].valid && !queue[i].is_load && queue[i].inst_id < load_age) {
+                if (queue[i].addr_ready && queue[i].address == target_addr) {
+                    if (!found_forwarding_store || queue[i].inst_id > youngest_older_store_age) {
+                        found_forwarding_store = true;
+                        youngest_older_store_age = queue[i].inst_id;
 
-                    if (!queue[i].data_ready) {
-                        return false;
+                        if (!queue[i].data_ready) {
+                            return false;
+                        }
+                        forwarded_data = queue[i].data;
                     }
-                    forwarded_data = queue[i].data;
                 }
             }
         }
@@ -116,11 +136,11 @@ bool LoadStoreQueue::dispatchLoad(uint32_t load_id) {
     queue[load_index].is_accessing_memory = true;
 
     if (found_forwarding_store) {
-        queue[load_index].cycles_remaining = 1;
+        queue[load_index].cycles_remaining = fwd_latency;
         queue[load_index].memory_data_buffer = forwarded_data;
     } else {
-        queue[load_index].cycles_remaining = 5;
-        queue[load_index].memory_data_buffer = MainMemory[target_addr];
+        queue[load_index].cycles_remaining = mem_latency;
+        queue[load_index].memory_data_buffer = memRead(target_addr);
     }
 
     return true;
@@ -156,7 +176,7 @@ void LoadStoreQueue::commitStore(uint32_t store_id) {
     for (int i = 0; i < capacity; i++) {
         if (queue[i].valid && queue[i].inst_id == store_id && !queue[i].is_load) {
             if (queue[i].addr_ready && queue[i].data_ready) {
-                MainMemory[queue[i].address] = queue[i].data;
+                memWrite(queue[i].address, queue[i].data);
                 queue[i].valid = false;
             }
             return;

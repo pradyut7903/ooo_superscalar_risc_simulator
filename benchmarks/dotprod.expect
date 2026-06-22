@@ -1,0 +1,4 @@
+# expected architectural state for dotprod
+R1 512
+R2 512
+R3 6125

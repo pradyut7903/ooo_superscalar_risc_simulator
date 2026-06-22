@@ -2,6 +2,8 @@
 build/
 cmake-build-*/
 out/
+__pycache__/
+*.pyc
 
 # Compiled objects and binaries
 *.o
@@ -15,3 +17,8 @@ pipeline_sim.exe
 # IDE
 .vs/
 *.user
+
+# Local docs (not published)
+README.md
+AGENT_CONTEXT.md
+EXPERIMENTS.md

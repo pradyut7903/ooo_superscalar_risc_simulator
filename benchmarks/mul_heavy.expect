@@ -1,0 +1,9 @@
+# expected architectural state for mul_heavy
+R1 400
+R2 400
+R3 15
+R4 15
+R5 15
+R6 15
+R10 3
+R11 5

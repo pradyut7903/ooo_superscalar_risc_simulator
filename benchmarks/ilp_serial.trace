@@ -1,0 +1,6 @@
+# ilp_serial: serial dependency chain, N=2000
+0x1000 ADDI 2 0 0 2000
+0x1004 ADDI 1 0 0 0
+0x1008 ADDI 1 1 0 1
+0x100C ADD 3 3 1 0
+0x1010 BNE 0 1 2 4104

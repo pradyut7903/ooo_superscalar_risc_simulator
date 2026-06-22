@@ -4,6 +4,11 @@ project(pipeline_simulator LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# The installed experimental GCC 16.1.0 miscompiles this code at -O1/-O2 (a
+# layout-dependent teardown crash). Force -O0; the simulator is small and fast
+# enough that optimization is unnecessary. See AGENT_CONTEXT.md / EXPERIMENTS.md.
+add_compile_options(-O0)
+
 add_executable(pipeline_sim
     src/main.cpp
     src/processor.cpp
