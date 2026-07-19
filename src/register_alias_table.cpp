@@ -1,5 +1,7 @@
 #include "register_alias_table.hpp"
 
+#include <unordered_set>
+
 RegisterAliasTable::RegisterAliasTable(int logical_count) {
     num_logical_regs = logical_count;
     rat.resize(num_logical_regs, -1);
@@ -33,6 +35,18 @@ std::vector<int> RegisterAliasTable::getState() const {
 void RegisterAliasTable::restoreState(const std::vector<int>& state) {
     if (static_cast<int>(state.size()) == num_logical_regs) {
         rat = state;
+    }
+}
+
+void RegisterAliasTable::restoreStateScrub(const std::vector<int>& state,
+                                           const std::unordered_set<int>& freed_tags) {
+    if (static_cast<int>(state.size()) != num_logical_regs) return;
+    rat = state;
+    if (num_logical_regs > 0) rat[0] = -1;  // x0 never renamed
+    for (int i = 1; i < num_logical_regs; ++i) {
+        if (rat[i] >= 0 && freed_tags.count(rat[i]) > 0) {
+            rat[i] = -1;
+        }
     }
 }
 

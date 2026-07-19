@@ -1,0 +1,4 @@
+# expected architectural state for loop_accumulate
+R1 20
+R2 20
+R3 210

@@ -1,0 +1,5 @@
+# waw_youngest: WAW: youngest writer wins; in-order commit
+0x1000 ADDI 1 0 0 1
+0x1004 ADDI 1 0 0 2
+0x1008 ADDI 1 0 0 3
+0x100C ADD 2 1 0 0

@@ -1,0 +1,8 @@
+# mem_order_violation: conservative late-store then load
+0x1000 ADDI 1 0 0 100
+0x1004 ADDI 3 0 0 50
+0x1008 ADDI 4 0 0 5
+0x100C DIV 5 3 4 0
+0x1010 ADDI 6 0 0 10
+0x1014 STORE 1 5 0 0
+0x1018 LOAD 2 6 0 0

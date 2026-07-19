@@ -1,0 +1,5 @@
+# expected architectural state for negatives
+R1 3
+R2 10
+R3 -7
+R4 -2

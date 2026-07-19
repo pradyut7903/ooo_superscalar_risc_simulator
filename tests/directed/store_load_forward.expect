@@ -1,0 +1,4 @@
+# expected architectural state for store_load_forward
+R1 77
+R2 77
+R3 154

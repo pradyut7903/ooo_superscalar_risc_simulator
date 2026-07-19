@@ -1,0 +1,6 @@
+# store_load_forward: store->load forwarding (same address)
+0x1000 ADDI 1 0 0 77
+0x1004 ADDI 4 0 0 100
+0x1008 STORE 1 4 0 0
+0x100C LOAD 2 4 0 0
+0x1010 ADD 3 2 2 0

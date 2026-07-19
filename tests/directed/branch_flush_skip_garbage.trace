@@ -1,0 +1,5 @@
+# branch_flush_skip_garbage: branch flush squashes wrong-path write to R5
+0x1000 ADDI 5 0 0 100
+0x1004 BEQ 0 0 0 4108
+0x1008 ADDI 5 0 0 999
+0x100C ADDI 6 0 0 7

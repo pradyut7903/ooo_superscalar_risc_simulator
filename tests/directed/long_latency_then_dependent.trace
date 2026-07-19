@@ -1,0 +1,6 @@
+# long_latency_then_dependent: dependent op waits for long-latency DIV
+0x1000 ADDI 1 0 0 100
+0x1004 ADDI 2 0 0 4
+0x1008 DIV 3 1 2 0
+0x100C ADD 4 3 1 0
+0x1010 MUL 5 3 3 0

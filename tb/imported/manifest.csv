@@ -1,0 +1,17 @@
+name,source,imem,dmem,text_words,data_words
+alu,external\RV32IM-OOO-Superscalar-CPU\testcode\alu.s,rtl_v2\tb\imported\alu.imem.hex,rtl_v2\tb\imported\alu.dmem.hex,42,24
+branch,external\RV32IM-OOO-Superscalar-CPU\testcode\branch.s,rtl_v2\tb\imported\branch.imem.hex,rtl_v2\tb\imported\branch.dmem.hex,17,0
+branchtaken,external\RV32IM-OOO-Superscalar-CPU\testcode\branchtaken.s,rtl_v2\tb\imported\branchtaken.imem.hex,rtl_v2\tb\imported\branchtaken.dmem.hex,37,0
+cp1_example,external\RV32IM-OOO-Superscalar-CPU\testcode\cp1_example.s,rtl_v2\tb\imported\cp1_example.imem.hex,rtl_v2\tb\imported\cp1_example.dmem.hex,8,0
+cp2_example,external\RV32IM-OOO-Superscalar-CPU\testcode\cp2_example.s,rtl_v2\tb\imported\cp2_example.imem.hex,rtl_v2\tb\imported\cp2_example.dmem.hex,3,0
+custom_riscv,external\RV32IM-OOO-Superscalar-CPU\testcode\custom_riscv.s,rtl_v2\tb\imported\custom_riscv.imem.hex,rtl_v2\tb\imported\custom_riscv.dmem.hex,62,207
+dependency_test,external\RV32IM-OOO-Superscalar-CPU\testcode\dependency_test.s,rtl_v2\tb\imported\dependency_test.imem.hex,rtl_v2\tb\imported\dependency_test.dmem.hex,25,0
+jump,external\RV32IM-OOO-Superscalar-CPU\testcode\jump.s,rtl_v2\tb\imported\jump.imem.hex,rtl_v2\tb\imported\jump.dmem.hex,8,0
+load,external\RV32IM-OOO-Superscalar-CPU\testcode\load.s,rtl_v2\tb\imported\load.imem.hex,rtl_v2\tb\imported\load.dmem.hex,36,44
+load_store_grinder,external\RV32IM-OOO-Superscalar-CPU\testcode\load_store_grinder.s,rtl_v2\tb\imported\load_store_grinder.imem.hex,rtl_v2\tb\imported\load_store_grinder.dmem.hex,30,44
+ooo_test,external\RV32IM-OOO-Superscalar-CPU\testcode\ooo_test.s,rtl_v2\tb\imported\ooo_test.imem.hex,rtl_v2\tb\imported\ooo_test.dmem.hex,22,0
+riscv_mem,external\RV32IM-OOO-Superscalar-CPU\testcode\riscv_mem.s,rtl_v2\tb\imported\riscv_mem.imem.hex,rtl_v2\tb\imported\riscv_mem.dmem.hex,68,207
+simple_mem,external\RV32IM-OOO-Superscalar-CPU\testcode\simple_mem.s,rtl_v2\tb\imported\simple_mem.imem.hex,rtl_v2\tb\imported\simple_mem.dmem.hex,12,44
+simple_st,external\RV32IM-OOO-Superscalar-CPU\testcode\simple_st.s,rtl_v2\tb\imported\simple_st.imem.hex,rtl_v2\tb\imported\simple_st.dmem.hex,12,44
+store,external\RV32IM-OOO-Superscalar-CPU\testcode\store.s,rtl_v2\tb\imported\store.imem.hex,rtl_v2\tb\imported\store.dmem.hex,27,14
+super_simple,external\RV32IM-OOO-Superscalar-CPU\testcode\super_simple.s,rtl_v2\tb\imported\super_simple.imem.hex,rtl_v2\tb\imported\super_simple.dmem.hex,4,24

@@ -1,0 +1,3 @@
+# expected architectural state for branch_flush_skip_garbage
+R5 100
+R6 7

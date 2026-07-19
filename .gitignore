@@ -1,24 +1,30 @@
-# Build outputs
+# Build / sim artifacts
 build/
-cmake-build-*/
-out/
+**/xsim.dir/
+**/*.log
+**/*.jou
+**/*.pb
+**/*.wdb
+**/*.vcd
+workloads/coremark/build/
+workloads/coremark/build_smoke/
+*.elf
+*.map
+*.o
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Python
 __pycache__/
 *.pyc
+.venv/
 
-# Compiled objects and binaries
-*.o
-*.obj
-*.exe
-*.out
-*.app
-pipeline_sim
-pipeline_sim.exe
-
-# IDE
-.vs/
-*.user
-
-# Local docs (not published)
-README.md
-AGENT_CONTEXT.md
-EXPERIMENTS.md
+# Local scratch
+scratch/
+*.bak
+_agent_reviews/

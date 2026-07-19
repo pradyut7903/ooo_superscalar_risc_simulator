@@ -1,0 +1,15 @@
+# expected architectural state for rob_fill_independent
+R1 7
+R2 14
+R3 21
+R4 28
+R5 35
+R6 42
+R7 49
+R8 56
+R9 63
+R10 70
+R11 77
+R12 84
+R13 91
+R14 98

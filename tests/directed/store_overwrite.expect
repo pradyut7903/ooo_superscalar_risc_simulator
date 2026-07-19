@@ -1,0 +1,4 @@
+# expected architectural state for store_overwrite
+R1 11
+R2 22
+R3 22

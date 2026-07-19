@@ -1,0 +1,5 @@
+# negatives: negative immediates / signed subtraction
+0x1000 ADDI 1 0 0 3
+0x1004 ADDI 2 0 0 10
+0x1008 SUB 3 1 2 0
+0x100C ADDI 4 1 0 -5

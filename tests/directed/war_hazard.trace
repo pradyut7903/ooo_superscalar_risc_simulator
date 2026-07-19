@@ -1,0 +1,5 @@
+# war_hazard: WAR: reader keeps old value under renaming
+0x1000 ADDI 1 0 0 10
+0x1004 ADD 2 1 0 0
+0x1008 ADDI 1 0 0 20
+0x100C ADD 3 1 0 0

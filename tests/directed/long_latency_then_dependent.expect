@@ -1,0 +1,6 @@
+# expected architectural state for long_latency_then_dependent
+R1 100
+R2 4
+R3 25
+R4 125
+R5 625

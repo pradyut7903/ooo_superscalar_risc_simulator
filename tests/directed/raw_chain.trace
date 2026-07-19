@@ -1,0 +1,5 @@
+# raw_chain: RAW dependency chain
+0x1000 ADDI 1 0 0 5
+0x1004 ADD 2 1 1 0
+0x1008 MUL 3 2 1 0
+0x100C SUB 4 3 2 0

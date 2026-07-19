@@ -1,0 +1,5 @@
+# expected architectural state for raw_chain
+R1 5
+R2 10
+R3 50
+R4 40

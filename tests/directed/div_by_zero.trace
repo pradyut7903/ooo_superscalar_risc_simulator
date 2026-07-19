@@ -1,0 +1,4 @@
+# div_by_zero: DIV by zero -> 0
+0x1000 ADDI 1 0 0 50
+0x1004 DIV 2 1 0 0
+0x1008 DIV 3 1 1 0

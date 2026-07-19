@@ -74,9 +74,10 @@ def check_one(sim, trace, expect, max_cycles):
 
 
 def main():
+    root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     ap = argparse.ArgumentParser()
-    ap.add_argument("--sim", default="build/pipeline_sim.exe")
-    ap.add_argument("--dir", default="benchmarks")
+    ap.add_argument("--sim", default=os.path.join(root, "build", "pipeline_sim.exe"))
+    ap.add_argument("--dir", default=os.path.join(root, "benchmarks"))
     ap.add_argument("--max-cycles", type=int, default=5_000_000)
     args = ap.parse_args()
 

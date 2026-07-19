@@ -1,0 +1,7 @@
+# store_overwrite: younger store wins; later load sees it
+0x1000 ADDI 1 0 0 11
+0x1004 ADDI 2 0 0 22
+0x1008 ADDI 4 0 0 300
+0x100C STORE 1 4 0 0
+0x1010 STORE 2 4 0 0
+0x1014 LOAD 3 4 0 0

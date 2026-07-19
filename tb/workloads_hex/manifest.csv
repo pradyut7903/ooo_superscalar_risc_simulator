@@ -1,0 +1,8 @@
+name,source,imem,dmem,text_words,data_words
+ilp_loop,workloads/ilp_loop.s,ilp_loop.imem.hex,ilp_loop.dmem.hex,38,1
+matmul8,workloads/matmul8.s,matmul8.imem.hex,matmul8.dmem.hex,81,193
+mem_stream,workloads/mem_stream.s,mem_stream.imem.hex,mem_stream.dmem.hex,42,513
+mix_bench,workloads/mix_bench.s,mix_bench.imem.hex,mix_bench.dmem.hex,74,1
+stack_smoke,workloads/coremark/port/stack_smoke.s,stack_smoke.imem.hex,stack_smoke.dmem.hex,13,1
+c_smoke,workloads/coremark/build_smoke/c_smoke.elf,c_smoke.imem.hex,c_smoke.dmem.hex,19,1
+coremark,workloads/coremark/build/coremark.elf,coremark.imem.hex,coremark.dmem.hex,1708,2901

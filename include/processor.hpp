@@ -1,9 +1,13 @@
 #pragma once
 
+#include "cdb_arbiter.hpp"
+#include "dispatch_reg.hpp"
 #include "execution_engine.hpp"
 #include "gshare_predictor.hpp"
 #include "instruction_fetch_queue.hpp"
 #include "load_store_queue.hpp"
+#include "mem/memory_system.hpp"
+#include "rat_checkpoints.hpp"
 #include "register_alias_table.hpp"
 #include "reorder_buffer.hpp"
 #include "reservation_station.hpp"
@@ -11,6 +15,7 @@
 #include "types.hpp"
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -18,20 +23,24 @@
 
 // Superscalar processor configuration. Every field is a runtime knob so that
 // sweep experiments can vary it from the command line without recompiling.
+// Knobs marked "RTL / unused" mirror github_ooo_rv32im pkg_cpu defaults but are
+// not wired into the cycle model yet (Stage 1) — changing them must not alter
+// timing until a later stage consumes them.
 struct ProcessorConfig {
-    int width = 4;             // fetch / issue / commit instructions per cycle
+    int width = 4;             // fetch / issue / commit (RTL WIDTH)
 
-    int num_regs = 16;
+    // Defaults match ooo_rtl/rtl_v2 pkg_cpu.sv (+ hex forces num_regs=32, pc=0).
+    int num_regs = 32;
     int rob_size = 32;
     int rs_size = 32;
     int lsq_size = 32;
     int ifq_size = 32;
-    int cdb_width = 4;         // Common Data Bus write ports (defaults to width)
+    int cdb_width = 4;
     int ras_size = 16;
-    int pht_size = 1024;       // generous predictor by default so branch aliasing
-    int btb_size = 256;        // does not contaminate the non-branch studies
+    int pht_size = 1024;
+    int btb_size = 256;
 
-    // Execution resources (functional-unit mix and latencies)
+    // Execution resources
     int num_alu = 2;
     int num_mul = 1;
     int num_div = 1;
@@ -39,13 +48,38 @@ struct ProcessorConfig {
     int mul_latency = 3;
     int div_latency = 10;
 
-    // Memory system
-    int mem_latency = 5;       // load latency on a store-forwarding miss
-    int fwd_latency = 1;       // store-to-load forwarding latency
+    // Ideal-path load / forward latencies (RTL dmem ≈ 1-cycle)
+    int mem_latency = 1;
+    int fwd_latency = 1;
     bool store_forwarding = true;
 
-    uint64_t initial_pc = 0x1000;
+    uint64_t initial_pc = 0;
     int max_cycles = 100000;
+
+    int num_br = 1;
+    int br_latency = 1;
+    int num_lsq = 2;
+
+    int store_buf_depth = 8;
+
+    // RTL default MEM_SYSTEM_CACHED
+    MemSystem mem_system = MemSystem::Cached;
+
+    // Cache / DRAM knobs (Stage 8)
+    int cache_line_bytes = 32;
+    int dcache_sets = 16;
+    int dcache_ways = 4;
+    int icache_sets = 16;
+    int icache_ways = 4;
+    int dcache_mshr = 4;
+    int icache_mshr = 2;
+    int dcache_ufp_ports = 2;
+    int mshr_waiters = 4;      // CPU ops queued per D$ MSHR (RTL MSHR_WAITERS)
+    int load_hit_latency = 1;  // D$ load-hit delay (RTL hit_pend ≈ 1)
+    int fetch_hit_latency = 1; // I$ hit delay (RTL hit_pend ≈ 1)
+    int dram_outstanding = 4;
+    int dram_lat_cycles = 10;
+    int dram_model = 0;        // 0 = simple, 1 = banked (matches pkg_cpu)
 };
 
 // Aggregate performance counters collected over a run.
@@ -66,7 +100,6 @@ struct ProcessorStats {
     uint64_t branch_mispredicts = 0;
     uint64_t flushes = 0;
     uint64_t squashed = 0;           // in-flight instructions discarded by flushes
-    uint64_t mem_order_violations = 0;
 
     // Per-cycle stall accounting: why issue could not make full progress.
     uint64_t stall_front = 0;        // IFQ empty (front-end starvation)
@@ -93,6 +126,16 @@ struct InstInfo {
     bool is_call = false;
     bool is_ret = false;
     bool is_addi = false;
+    MemSize mem_size = MemSize::W;
+    bool mem_unsigned = false;
+
+    // RV32 hex path
+    bool has_uop = false;
+    Op op = Op::UOP_NOP;
+    Fu fu = Fu::ALU;
+    bool src2_is_imm = false;
+    bool is_jump = false;
+    bool rd_used = false;
 
     bool src1_ready = false;
     int src1_tag = -1;
@@ -118,14 +161,20 @@ struct InstInfo {
 
     bool completed = false;
 
-    // Branch misprediction is recorded here when the branch resolves, then acted
-    // on when the branch reaches the ROB head (so only younger work is squashed).
+    // Set at execute-time resolve. Early recovery runs immediately on mispredict;
+    // predictor is trained later at commit from br_* fields.
     bool mispredicted = false;
     uint64_t recovery_pc = 0;
+    bool br_resolved = false;
+    bool br_taken = false;
+    uint64_t br_next_pc = 0;
 
-    std::vector<int> rat_snapshot;
+    std::vector<int> rat_snapshot;  // pre-rename fallback if RAT checkpoint miss
     int ras_tos = 0;
     int ras_count = 0;
+    std::vector<uint64_t> ras_stack;
+    bool ras_had_return = false;
+    uint64_t ras_ret_target = 0;
 };
 
 class Processor {
@@ -134,6 +183,8 @@ public:
 
     void loadInstructionCache(const std::string& trace_path);
     void loadInstructionCacheFromVector(const std::vector<FetchedInstruction>& program);
+    // Load RV32IM imem.hex (+ optional dmem.hex). Forces 32 regs, PC=0, byte mem.
+    void loadHexProgram(const std::string& imem_path, const std::string& dmem_path = "");
 
     void tick();
     void run();
@@ -143,9 +194,16 @@ public:
 
     const ProcessorStats& getStats() const { return stats; }
     const ProcessorConfig& getConfig() const { return config; }
+    const std::vector<int>& getArf() const { return arf; }
+    bool isHexMode() const { return hex_mode; }
+
+    // When enabled, assert structural invariants at the end of every tick (slow;
+    // used by the verification harness, off for performance sweeps).
+    void enableSelfCheck(bool b) { self_check = b; }
 
     void printState() const;
-    void printArchState() const;                   // final ARF + nonzero memory (for validation)
+    void printArchState();                         // final ARF + nonzero memory (for validation)
+    void printRegsDump() const;                    // x0..xN one-per-line for golden compare
     void printStats() const;                       // human-readable summary
     void printStatsCSV(const std::string& label) const;  // one CSV data row
     static void printStatsCSVHeader();             // matching CSV header row
@@ -154,16 +212,52 @@ private:
     ProcessorConfig config;
 
     InstructionFetchQueue ifq;
+    DispatchReg dispatch_reg;
     RegisterAliasTable rat;
+    RatCheckpoints rat_ckpts;
     ReservationStation rs;
     ReorderBuffer rob;
     LoadStoreQueue lsq;
     ExecutionEngine ee;
+    CdbArbiter cdb_arbiter;
     GSharePredictor predictor;
     ReturnAddressStack ras;
+    std::unique_ptr<MemorySystem> memsys;
 
     std::vector<int> arf;
     std::unordered_map<uint64_t, FetchedInstruction> icache;
+
+    // Hex / imem path (Stage 3)
+    bool hex_mode = false;
+    bool fetch_halted = false;
+    bool imem_req_outstanding = false;
+    // Ideal imem: 1-cycle registered response (RTL ideal_imem_bridge).
+    int ideal_fetch_countdown_ = 0;
+    uint64_t ideal_fetch_pc_ = 0;
+    std::vector<uint32_t> imem;
+
+    // Cached fetch skid buffer (RTL fetch.sv buf_*): 1 bundle, can_request=!buf.
+    struct FetchBuf {
+        bool valid = false;
+        bool eop = false;
+        int count = 0;
+        std::vector<uint32_t> words;
+        std::vector<uint64_t> pcs;
+        std::vector<bool> pred_taken;
+        std::vector<uint64_t> pred_target;
+    };
+    FetchBuf fetch_buf_{};
+    // Predictions captured at I$ request (RTL req_pred_*).
+    std::vector<bool> fetch_req_pred_taken_;
+    std::vector<uint64_t> fetch_req_pred_target_;
+    // No I$ request the cycle of earlyRecover (RTL redirect if/else).
+    bool fetch_redirect_hold_ = false;
+
+    // Freed ROB tags this cycle (commit + squash) for RAT restore scrub.
+    std::unordered_set<int> freed_rob_tags_;
+
+    // RTL RS: CDB wakeup is registered — apply to RS/operands next tick.
+    std::vector<std::pair<int, int>> cdb_wakeup_pending_;
 
     uint64_t fetch_pc;
     uint64_t cycle_count;
@@ -171,37 +265,38 @@ private:
 
     std::unordered_map<uint32_t, InstInfo> inst_table;
 
-    bool flush_pending;
-    bool mispredict_outstanding;   // a branch has resolved mispredicted but not yet committed
-    uint64_t flush_pc;
-    std::vector<int> flush_rat_snapshot;
-    int flush_ras_tos;
-    int flush_ras_count;
-    uint32_t flush_inst_id;
-
-    bool mov_pending;
+    bool self_check = false;
 
     ProcessorStats stats;
-
-    std::unordered_set<uint64_t> conservative_load_pcs;
-
-    bool canDispatchLoadConservative(const InstInfo& load) const;
 
     void resolveOperand(int logical_reg, bool& ready, int& tag, int& val);
     void broadcastCDB(const CDBResult& result);
     void updateInstOperandsFromCDB(int rob_tag, int value);
+    // RTL resolve bus: taken/target/mispredict + earlyRecover (not gated on CDB).
+    void resolveBranch(InstInfo& info, int fu_value);
 
     void commitStage();
     void writebackStage();
     void dispatchStage();
-    void issueStage();
-    void fetchStage();
+    void issueStage();     // rename: accept prefix from dispatch_reg
+    void decodeStage();    // IFQ -> decode -> capture into dispatch_reg
+    void fetchStage();     // imem/icache -> IFQ (raw + prediction)
 
-    void performFlush();
-    void rebuildPipelineState();
+    void earlyRecover(InstInfo& br);  // execute-time selective squash + redirect
+    void processStoreBuffer();        // ROB store permissions → SB enqueue
+    std::vector<int> storeCommitPermissions() const;
+    void checkInvariants() const;   // structural assertions (self-check mode)
 
     bool isMemoryOp(const std::string& op) const;
     bool isBranchOp(const std::string& op) const;
+    bool isControl(const InstInfo& info) const;
+    bool imemWord(uint64_t pc, uint32_t& out_word) const;
+    bool useCachedMem() const;
+    // Enqueue one hex word into IFQ with prediction; advances/redirects fetch_pc.
+    // Returns false if IFQ full or halt word. Sets *redirected if fetch_pc jumped.
+    bool fetchEnqueueHexWord(uint32_t word, uint64_t pc, bool* redirected = nullptr);
+    FetchedInstruction decodeForDispatch(const FetchedInstruction& fetched) const;
+    bool tryRenameOne(const FetchedInstruction& inst);
 
     InstInfo* findInstById(uint32_t inst_id);
     const InstInfo* findInstByRobId(int rob_id) const;

@@ -1,0 +1,4 @@
+# expected architectural state for div_by_zero
+R1 50
+R2 0
+R3 1

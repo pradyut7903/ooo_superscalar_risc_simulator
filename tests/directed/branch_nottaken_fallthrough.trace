@@ -1,0 +1,7 @@
+# branch_nottaken_fallthrough: not-taken branch keeps fall-through path
+0x1000 ADDI 1 0 0 5
+0x1004 BNE 0 1 1 4112
+0x1008 ADDI 2 0 0 42
+0x100C BEQ 0 0 0 4116
+0x1010 ADDI 2 0 0 777
+0x1014 ADDI 3 0 0 1

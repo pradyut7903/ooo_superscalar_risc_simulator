@@ -33,5 +33,7 @@ public:
     std::vector<uint32_t> collectReadyInstructions() const;
     void removeInstruction(uint32_t id);
     int issueReadyInstruction();
+    // Drop any RS entries whose inst_id is in the set (early recovery).
+    void squashInstIds(const std::vector<uint32_t>& ids);
     void printState() const;
 };

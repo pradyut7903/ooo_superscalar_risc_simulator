@@ -93,6 +93,12 @@ void ReservationStation::removeInstruction(uint32_t id) {
     }
 }
 
+void ReservationStation::squashInstIds(const std::vector<uint32_t>& ids) {
+    for (uint32_t id : ids) {
+        removeInstruction(id);
+    }
+}
+
 int ReservationStation::issueReadyInstruction() {
     int ready_id = peekReadyInstruction();
     if (ready_id >= 0) {

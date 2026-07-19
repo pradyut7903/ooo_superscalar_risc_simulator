@@ -331,8 +331,9 @@ KERNELS = {
 
 
 def main():
+    root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     ap = argparse.ArgumentParser(description="Generate pipeline-simulator benchmarks")
-    ap.add_argument("--outdir", default="benchmarks")
+    ap.add_argument("--outdir", default=os.path.join(root, "benchmarks"))
     ap.add_argument("--only", nargs="*", help="generate only these kernels")
     args = ap.parse_args()
 

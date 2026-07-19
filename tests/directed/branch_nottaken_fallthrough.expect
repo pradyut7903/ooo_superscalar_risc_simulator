@@ -1,0 +1,4 @@
+# expected architectural state for branch_nottaken_fallthrough
+R1 5
+R2 42
+R3 1
