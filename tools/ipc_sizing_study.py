@@ -126,8 +126,9 @@ def run_one(sim: Path, name: str, cfg: dict[str, str], max_cycles: int) -> dict:
             line = ln.strip()
     cols = line.split(",")
     try:
-        cycles = int(cols[18])
-        commits = int(cols[19])
+        # ...,pht,btb,ras,bp,cycles,committed,...
+        cycles = int(cols[19])
+        commits = int(cols[20])
         ipc = float(cols[22])
         hit_cap = int(cols[-1])
     except (IndexError, ValueError) as ex:

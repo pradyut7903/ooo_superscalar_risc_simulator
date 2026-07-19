@@ -68,6 +68,21 @@ std::string opRobName(Op op) {
     }
 }
 
+// RISC-V ABI link/return regs used for RAS (x1=ra, x5=t0).
+bool isLinkReg(int r) { return r == 1 || r == 5; }
+
+bool isJalrReturn(const Uop& u) {
+    return u.op == Op::BR_JALR && u.rd == 0 && isLinkReg(u.rs1);
+}
+
+bool isJalrCall(const Uop& u) {
+    return u.op == Op::BR_JALR && isLinkReg(u.rd);
+}
+
+const char* bpModeName(BranchPredMode m) {
+    return (m == BranchPredMode::AlwaysTaken) ? "always-taken" : "gshare";
+}
+
 }  // namespace
 
 Processor::Processor(const ProcessorConfig& cfg)
@@ -723,10 +738,18 @@ void Processor::fetchStage() {
                 inst.pc = fetch_buf_.pcs[static_cast<size_t>(i)];
                 inst.raw_instr = fetch_buf_.words[static_cast<size_t>(i)];
                 inst.has_uop = false;
-                inst.predicted_taken = fetch_buf_.pred_taken[static_cast<size_t>(i)];
-                inst.predicted_target = fetch_buf_.pred_target[static_cast<size_t>(i)];
+                if (config.bp_mode == BranchPredMode::AlwaysTaken) {
+                    // Sequential RAS push/pop must happen at enqueue time.
+                    const Uop peek = decodeInstruction(inst.raw_instr, inst.pc);
+                    predictHexControl(inst.pc, peek, inst, /*apply_ras=*/true);
+                } else {
+                    // Keep request-time gshare decision (BTB/GHR may train during I$ miss).
+                    inst.predicted_taken = fetch_buf_.pred_taken[static_cast<size_t>(i)];
+                    inst.predicted_target = fetch_buf_.pred_target[static_cast<size_t>(i)];
+                }
                 if (!ifq.enqueue(inst)) break;
                 ++stats.fetched;
+                if (inst.predicted_taken) break;
             }
             const bool eop = fetch_buf_.eop;
             fetch_buf_ = FetchBuf{};
@@ -742,12 +765,13 @@ void Processor::fetchStage() {
                 uint32_t word = 0;
                 if (imemWord(pc, word) && word != INSTR_INVALID) {
                     const Uop peek = decodeInstruction(word, pc);
-                    if (peek.is_branch || peek.is_jump) {
-                        uint64_t target = 0;
-                        const bool pt = predictor.predict(pc, target);
-                        fetch_req_pred_taken_[static_cast<size_t>(i)] = pt;
-                        fetch_req_pred_target_[static_cast<size_t>(i)] =
-                            pt ? target : (pc + INSTR_SIZE);
+                    FetchedInstruction tmp{};
+                    // Peek-only: RAS commits when the word is enqueued to IFQ.
+                    predictHexControl(pc, peek, tmp, /*apply_ras=*/false);
+                    fetch_req_pred_taken_[static_cast<size_t>(i)] = tmp.predicted_taken;
+                    fetch_req_pred_target_[static_cast<size_t>(i)] = tmp.predicted_target;
+                    if (tmp.predicted_taken) {
+                        break;  // later slots unused once fetch redirects
                     }
                 }
             }
@@ -821,32 +845,8 @@ void Processor::fetchStage() {
         }
 
         inst = cache_it->second;
-        inst.predicted_taken = false;
-        inst.predicted_target = fetch_pc + INSTR_SIZE;
-        // Checkpoint RAS *before* speculative push/pop for this instruction.
-        ras.getFullSnapshot(inst.ras_tos, inst.ras_count, inst.ras_stack);
-        inst.ras_had_return = false;
-        inst.ras_ret_target = 0;
-
-        if (iequals(inst.opcode, "CALL")) {
-            ras.push(fetch_pc + INSTR_SIZE);
-            inst.predicted_taken = true;
-            inst.predicted_target = (inst.imm != 0)
-                ? static_cast<uint64_t>(inst.imm)
-                : static_cast<uint64_t>(inst.src1_reg);
-        } else if (iequals(inst.opcode, "RET")) {
-            uint64_t ret_target = 0;
-            if (ras.pop(ret_target)) {
-                inst.ras_had_return = true;
-                inst.ras_ret_target = ret_target;
-                inst.predicted_taken = true;
-                inst.predicted_target = ret_target;
-            }
-        } else if (isBranchOp(inst.opcode)) {
-            uint64_t target = 0;
-            inst.predicted_taken = predictor.predict(fetch_pc, target);
-            inst.predicted_target = inst.predicted_taken ? target : (fetch_pc + INSTR_SIZE);
-        }
+        inst.pc = fetch_pc;
+        predictToyControl(inst);
 
         if (!ifq.enqueue(inst)) {
             break;
@@ -1133,6 +1133,104 @@ void Processor::writebackStage() {
     cdb_arbiter.commitPending(after, granted_idx);
 }
 
+void Processor::predictHexControl(uint64_t pc, const Uop& peek, FetchedInstruction& inst,
+                                  bool apply_ras) {
+    inst.predicted_taken = false;
+    inst.predicted_target = pc + INSTR_SIZE;
+    inst.ras_had_return = false;
+    inst.ras_ret_target = 0;
+
+    if (!(peek.is_branch || peek.is_jump)) {
+        return;
+    }
+
+    if (config.bp_mode == BranchPredMode::AlwaysTaken) {
+        if (apply_ras) {
+            ras.getFullSnapshot(inst.ras_tos, inst.ras_count, inst.ras_stack);
+        }
+
+        if (peek.op == Op::BR_JAL) {
+            inst.predicted_taken = true;
+            inst.predicted_target = pc + static_cast<uint64_t>(static_cast<int64_t>(peek.imm));
+            if (apply_ras && isLinkReg(peek.rd)) {
+                ras.push(pc + INSTR_SIZE);
+            }
+            return;
+        }
+        if (peek.op == Op::BR_JALR) {
+            if (isJalrReturn(peek)) {
+                uint64_t ret_target = 0;
+                const bool have = apply_ras ? ras.pop(ret_target) : ras.peek(ret_target);
+                if (have) {
+                    inst.ras_had_return = true;
+                    inst.ras_ret_target = ret_target;
+                    inst.predicted_taken = true;
+                    inst.predicted_target = ret_target;
+                }
+            } else if (isJalrCall(peek)) {
+                // Target needs rs1; optionally push link, do not redirect.
+                if (apply_ras) {
+                    ras.push(pc + INSTR_SIZE);
+                }
+            }
+            return;
+        }
+        // Conditional branch: always taken to PC-relative target.
+        inst.predicted_taken = true;
+        inst.predicted_target = pc + static_cast<uint64_t>(static_cast<int64_t>(peek.imm));
+        return;
+    }
+
+    // gshare: PHT+BTB only; RAS unused.
+    uint64_t target = 0;
+    const bool pt = predictor.predict(pc, target);
+    inst.predicted_taken = pt;
+    inst.predicted_target = pt ? target : (pc + INSTR_SIZE);
+}
+
+void Processor::predictToyControl(FetchedInstruction& inst) {
+    inst.predicted_taken = false;
+    inst.predicted_target = inst.pc + INSTR_SIZE;
+    inst.ras_had_return = false;
+    inst.ras_ret_target = 0;
+    ras.getFullSnapshot(inst.ras_tos, inst.ras_count, inst.ras_stack);
+
+    if (iequals(inst.opcode, "CALL")) {
+        // Toy RET is architecturally RAS-defined; always push the link.
+        ras.push(inst.pc + INSTR_SIZE);
+        inst.predicted_taken = true;
+        inst.predicted_target = (inst.imm != 0)
+            ? static_cast<uint64_t>(inst.imm)
+            : static_cast<uint64_t>(inst.src1_reg);
+        return;
+    }
+    if (iequals(inst.opcode, "RET")) {
+        uint64_t ret_target = 0;
+        if (ras.pop(ret_target)) {
+            inst.ras_had_return = true;
+            inst.ras_ret_target = ret_target;
+            // Only always-taken uses RAS as a fetch prediction.
+            if (config.bp_mode == BranchPredMode::AlwaysTaken) {
+                inst.predicted_taken = true;
+                inst.predicted_target = ret_target;
+            }
+        }
+        return;
+    }
+    if (!isBranchOp(inst.opcode)) {
+        return;
+    }
+    if (config.bp_mode == BranchPredMode::AlwaysTaken) {
+        inst.predicted_taken = true;
+        inst.predicted_target = static_cast<uint64_t>(inst.imm);
+        return;
+    }
+    uint64_t target = 0;
+    const bool pt = predictor.predict(inst.pc, target);
+    inst.predicted_taken = pt;
+    inst.predicted_target = pt ? target : (inst.pc + INSTR_SIZE);
+}
+
 bool Processor::fetchEnqueueHexWord(uint32_t word, uint64_t pc, bool* redirected) {
     if (redirected) *redirected = false;
     if (word == INSTR_INVALID) {
@@ -1148,15 +1246,7 @@ bool Processor::fetchEnqueueHexWord(uint32_t word, uint64_t pc, bool* redirected
     inst.pc = pc;
     inst.raw_instr = word;
     inst.has_uop = false;
-    inst.predicted_taken = false;
-    inst.predicted_target = pc + INSTR_SIZE;
-
-    if (peek.is_branch || peek.is_jump) {
-        // RTL: all control (incl. JAL) go through gshare+BTB; no hard-take.
-        uint64_t target = 0;
-        inst.predicted_taken = predictor.predict(pc, target);
-        inst.predicted_target = inst.predicted_taken ? target : (pc + INSTR_SIZE);
-    }
+    predictHexControl(pc, peek, inst, /*apply_ras=*/true);
 
     if (!ifq.enqueue(inst)) {
         return false;
@@ -1213,7 +1303,7 @@ void Processor::commitStage() {
             }
             if (isControl(*info)) {
                 ++stats.committed_branch;
-                if (info->br_resolved) {
+                if (info->br_resolved && config.bp_mode == BranchPredMode::GShare) {
                     predictor.update(info->pc, info->br_taken, info->br_next_pc);
                 }
                 rat_ckpts.invalidate(rob_id);
@@ -1336,7 +1426,8 @@ void Processor::printStats() const {
               << " SB=" << config.store_buf_depth
               << " memLat=" << config.mem_latency
               << " fwd=" << (config.store_forwarding ? "on" : "off") << "\n";
-    std::cout << "          PHT=" << config.pht_size << " BTB=" << config.btb_size
+    std::cout << "          BP=" << bpModeName(config.bp_mode)
+              << " PHT=" << config.pht_size << " BTB=" << config.btb_size
               << " RAS=" << config.ras_size << "\n";
     std::cout << "-------------------------------------------------------\n";
     std::cout << "  Cycles                : " << s.cycles
@@ -1365,7 +1456,7 @@ void Processor::printStats() const {
 
 void Processor::printStatsCSVHeader() {
     std::cout << "benchmark,width,rob,rs,lsq,ifq,cdb,alu,mul,div,"
-              << "alu_lat,mul_lat,div_lat,mem_lat,fwd,pht,btb,ras,"
+              << "alu_lat,mul_lat,div_lat,mem_lat,fwd,pht,btb,ras,bp,"
               << "cycles,committed,fetched,issued,ipc,"
               << "c_alu,c_mul,c_div,c_load,c_store,c_branch,"
               << "branches,mispredicts,mispred_rate,flushes,squashed,"
@@ -1385,6 +1476,7 @@ void Processor::printStatsCSV(const std::string& label) const {
               << config.alu_latency << ',' << config.mul_latency << ',' << config.div_latency << ','
               << config.mem_latency << ',' << (config.store_forwarding ? 1 : 0) << ','
               << config.pht_size << ',' << config.btb_size << ',' << config.ras_size << ','
+              << bpModeName(config.bp_mode) << ','
               << s.cycles << ',' << s.committed << ',' << s.fetched << ',' << s.issued << ','
               << ipc << ','
               << s.committed_alu << ',' << s.committed_mul << ',' << s.committed_div << ','

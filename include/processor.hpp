@@ -21,6 +21,12 @@
 #include <unordered_set>
 #include <vector>
 
+// Frontend branch prediction policy (no extra predictor tables beyond gshare+BTB).
+enum class BranchPredMode {
+    GShare,       // gshare PHT + BTB; RAS unused at fetch
+    AlwaysTaken,  // PC-relative always taken; RAS for call/return
+};
+
 // Superscalar processor configuration. Every field is a runtime knob so that
 // sweep experiments can vary it from the command line without recompiling.
 // Knobs marked "RTL / unused" mirror github_ooo_rv32im pkg_cpu defaults but are
@@ -39,6 +45,7 @@ struct ProcessorConfig {
     int ras_size = 16;
     int pht_size = 1024;
     int btb_size = 256;
+    BranchPredMode bp_mode = BranchPredMode::GShare;
 
     // Execution resources
     int num_alu = 2;
@@ -295,6 +302,11 @@ private:
     // Enqueue one hex word into IFQ with prediction; advances/redirects fetch_pc.
     // Returns false if IFQ full or halt word. Sets *redirected if fetch_pc jumped.
     bool fetchEnqueueHexWord(uint32_t word, uint64_t pc, bool* redirected = nullptr);
+    // Fill predicted_taken/target. If apply_ras, push/pop RAS (always-taken only).
+    void predictHexControl(uint64_t pc, const Uop& peek, FetchedInstruction& inst,
+                           bool apply_ras);
+    // Toy-trace CALL/RET/BEQ prediction under the active bp_mode.
+    void predictToyControl(FetchedInstruction& inst);
     FetchedInstruction decodeForDispatch(const FetchedInstruction& fetched) const;
     bool tryRenameOne(const FetchedInstruction& inst);
 

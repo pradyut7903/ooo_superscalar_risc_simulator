@@ -1,0 +1,17 @@
+program,bp,result,commits,cycles,ipc,branches,mispredicts,mispred_pct,hit_cap
+branch,gshare,PASS,8200,19583,0.418731,4096,1041,25.415,0
+branch,always-taken,PASS,8200,22576,0.363218,4096,1027,25.0732,0
+custom_riscv,gshare,PASS,12906,20839,0.61932,2574,40,1.554,0
+custom_riscv,always-taken,PASS,12906,20685,0.62393,2574,5,0.19425,0
+riscv_mem,gshare,PASS,8950,10921,0.819522,1274,48,3.76766,0
+riscv_mem,always-taken,PASS,8950,10701,0.83637,1274,5,0.392465,0
+ilp_loop,gshare,PASS,40969,49237,0.832078,4096,10,0.24414100000000002,0
+ilp_loop,always-taken,PASS,40969,49193,0.832822,4096,1,0.0244141,0
+matmul8,gshare,PASS,7780,11021,0.705925,584,82,14.0411,0
+matmul8,always-taken,PASS,7780,11147,0.697946,584,73,12.5,0
+mem_stream,gshare,PASS,98568,132215,0.745513,16448,143,0.869407,0
+mem_stream,always-taken,PASS,98568,131757,0.748104,16448,65,0.395185,0
+mix_bench,gshare,PASS,47269,86552,0.546134,10272,4136,40.2648,0
+mix_bench,always-taken,PASS,47269,78306,0.603645,10272,2081,20.259,0
+coremark,gshare,PASS,405279,748781,0.541252,108915,25995,23.8672,0
+coremark,always-taken,PASS,405279,874296,0.463549,111440,40178,36.0535,0

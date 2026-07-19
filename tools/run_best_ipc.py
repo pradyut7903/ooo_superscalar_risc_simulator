@@ -97,10 +97,10 @@ def run_one(sim: Path, name: str, imem: Path, dmem: Path | None, max_cycles: int
     cols = line.split(",")
     # csv: ...,cycles,committed,fetched,issued,ipc,... hit_cap last
     try:
-        # Header: ...,pht,btb,ras,cycles,committed,fetched,issued,ipc,...
-        cycles = int(cols[18])
-        commits = int(cols[19])
-        ipc = float(cols[22])
+        # Header: ...,pht,btb,ras,bp,cycles,committed,fetched,issued,ipc,...
+        cycles = int(cols[19])
+        commits = int(cols[20])
+        ipc = float(cols[23])
         hit_cap = int(cols[-1])
     except (IndexError, ValueError) as ex:
         return {

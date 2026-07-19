@@ -28,6 +28,8 @@ void printUsage(const char* prog) {
         "  --ras N          Return address stack depth (default 16)\n"
         "  --pht N          gshare PHT entries (default 1024)\n"
         "  --btb N          BTB entries (default 256)\n"
+        "  --bp MODE        Branch predictor: gshare (default) or always-taken\n"
+        "                   gshare = PHT+BTB, no RAS; always-taken = PC-rel taken + RAS\n"
         "  --alu N          Number of ALU units (default 2)\n"
         "  --mul N          Number of MUL units (default 1)\n"
         "  --div N          Number of DIV units (default 1)\n"
@@ -125,6 +127,16 @@ int main(int argc, char* argv[]) {
         else if (a == "--ras") cfg.ras_size = nextInt(argc, argv, i, "--ras");
         else if (a == "--pht") cfg.pht_size = nextInt(argc, argv, i, "--pht");
         else if (a == "--btb") cfg.btb_size = nextInt(argc, argv, i, "--btb");
+        else if (a == "--bp") {
+            const std::string s = nextStr(argc, argv, i, "--bp");
+            if (s == "gshare" || s == "GSHARE") cfg.bp_mode = BranchPredMode::GShare;
+            else if (s == "always-taken" || s == "always_taken" || s == "at")
+                cfg.bp_mode = BranchPredMode::AlwaysTaken;
+            else {
+                std::cerr << "Error: --bp expects gshare|always-taken\n";
+                return 2;
+            }
+        }
         else if (a == "--alu") cfg.num_alu = nextInt(argc, argv, i, "--alu");
         else if (a == "--mul") cfg.num_mul = nextInt(argc, argv, i, "--mul");
         else if (a == "--div") cfg.num_div = nextInt(argc, argv, i, "--div");
